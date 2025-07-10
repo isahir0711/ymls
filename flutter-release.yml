@@ -8,7 +8,9 @@ on:
     branches: ["master"]
   pull_request:
     branches: ["master"]
-
+# needed if you want to create the release
+permissions:
+  contents: write
 
 jobs:
   build:
