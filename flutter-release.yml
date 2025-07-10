@@ -1,0 +1,84 @@
+name: Your Action Name
+#change this based on the action
+run-name: ${{ github.actor }} is deploying/running something 🚀
+
+##so only trigger when push to master/main or if there is a PR on master/main
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      #Update this based on the flutter/dart version of the project
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+
+      - name: Check Flutter version
+        run: |
+          flutter --version
+          dart --version
+
+      - name: Check Android project structure
+        run: |
+          echo "Checking Android project structure..."
+          ls -la android/
+          ls -la android/app/src/main/
+          echo "Checking for AndroidManifest.xml files..."
+          find android/ -name "AndroidManifest.xml" -type f
+
+      - name: Ensure proper Android setup
+        run: |
+          echo "Verifying Android embedding v2 setup..."
+          if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+            grep -q "flutterEmbedding.*2" android/app/src/main/AndroidManifest.xml && echo "✓ Android embedding v2 detected" || echo "⚠ Android embedding version unclear"
+          fi
+
+      - name: Clean and get dependencies
+        run: |
+          flutter clean
+          echo "Checking pubspec.yaml SDK requirements..."
+          grep -A 2 "environment:" pubspec.yaml
+          echo "Getting dependencies..."
+          flutter pub get
+
+      - name: Build APK
+        run: |
+          echo "Starting APK build..."
+          flutter build apk --split-per-abi --release
+          echo "Build completed. Checking output..."
+          ls -la build/app/outputs/flutter-apk/
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apks
+          path: build/app/outputs/flutter-apk/*.apk
+
+      #So if you want to get the apk on the relase tab for the repo use this
+      #you will need a token to allow the action to submit the files and create the realase
+      #See: https://github.com/softprops/action-gh-release?tab=readme-ov-file#-limit-releases-to-pushes-to-tags
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/app/outputs/flutter-apk/*.apk
+          tag_name: v1.0.${{ github.run_number }}
+          name: Release ${{ github.run_number }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
